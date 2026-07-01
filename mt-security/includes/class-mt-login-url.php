@@ -42,7 +42,11 @@ class MT_Sec_Login_Url {
 	 * Chạy module.
 	 */
 	public function run() {
-		add_action( 'plugins_loaded', array( $this, 'intercept' ), 1 );
+		// Dùng 'wp_loaded': WP đã nạp đủ (gồm pluggable.php) nên require wp-login.php an toàn,
+		// nhưng vẫn chạy TRƯỚC khi WordPress định tuyến & quyết định 404.
+		add_action( 'wp_loaded', array( $this, 'intercept' ), 1 );
+		// Chặn khách vào /wp-admin -> đặt ở 'init' để hàm is_user_logged_in() sẵn sàng.
+		add_action( 'init', array( $this, 'block_admin' ), 0 );
 		add_filter( 'site_url', array( $this, 'filter_login_url' ), 10, 4 );
 		add_filter( 'network_site_url', array( $this, 'filter_login_url' ), 10, 3 );
 		add_filter( 'wp_redirect', array( $this, 'filter_redirect' ), 10, 2 );
@@ -87,17 +91,8 @@ class MT_Sec_Login_Url {
 		if ( $is_wplogin && empty( $GLOBALS['mt_sec_login_ok'] ) ) {
 			// Cho phép logout/postpass/luồng nội bộ POST hợp lệ đi qua action an toàn.
 			$action = isset( $_REQUEST['action'] ) ? $_REQUEST['action'] : '';
-			$allowed_actions = array( 'logout', 'postpass', 'rp', 'resetpass' );
+			$allowed_actions = array( 'logout', 'postpass', 'rp', 'resetpass', 'confirmaction' );
 			if ( in_array( $action, $allowed_actions, true ) ) {
-				return;
-			}
-			$this->deny();
-		}
-
-		// 3) Khách (chưa đăng nhập) gõ /wp-admin -> 404 (trừ admin-ajax & admin-post).
-		if ( ! is_user_logged_in() && 0 === strpos( $path, 'wp-admin' ) ) {
-			if ( false !== strpos( $_SERVER['REQUEST_URI'], 'admin-ajax.php' ) ||
-				false !== strpos( $_SERVER['REQUEST_URI'], 'admin-post.php' ) ) {
 				return;
 			}
 			$this->deny();
@@ -105,24 +100,58 @@ class MT_Sec_Login_Url {
 	}
 
 	/**
+	 * Chặn khách (chưa đăng nhập) truy cập /wp-admin -> 404.
+	 * Chạy ở 'init' (trước auth_redirect của wp-admin) nên khách bị 404 thay vì bị đá về trang login.
+	 */
+	public function block_admin() {
+		if ( ! is_admin() ) {
+			return; // Chỉ xử lý khu vực quản trị.
+		}
+		// Cho phép các endpoint hợp lệ mà front-end cần gọi.
+		if ( ( defined( 'DOING_AJAX' ) && DOING_AJAX ) || ( defined( 'DOING_CRON' ) && DOING_CRON ) ) {
+			return;
+		}
+		$uri = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '';
+		if ( false !== strpos( $uri, 'admin-ajax.php' ) || false !== strpos( $uri, 'admin-post.php' ) ) {
+			return;
+		}
+		if ( is_user_logged_in() ) {
+			return; // Đã đăng nhập -> vào bình thường.
+		}
+		$this->deny();
+	}
+
+	/**
 	 * Trả về 404 không lộ thông tin.
 	 */
 	private function deny() {
-		status_header( 404 );
-		nocache_headers();
-		// Cố gắng dùng template 404 của theme cho tự nhiên.
-		if ( function_exists( 'get_query_template' ) ) {
+		if ( ! headers_sent() ) {
+			status_header( 404 );
+			nocache_headers();
+		}
+
+		global $wp_query;
+
+		// Front-end: cố dùng template 404 của theme cho tự nhiên (khi WP đã sẵn sàng).
+		if ( ! is_admin() && did_action( 'template_redirect' ) === 0 && function_exists( 'get_query_template' ) ) {
+			if ( $wp_query ) {
+				$wp_query->set_404();
+			}
 			$tpl = get_query_template( '404' );
-			if ( $tpl ) {
-				global $wp_query;
-				if ( $wp_query ) {
-					$wp_query->set_404();
-				}
+			if ( $tpl && file_exists( $tpl ) ) {
 				include $tpl;
 				exit;
 			}
 		}
-		exit( '404 Not Found' );
+
+		// Fallback tối giản (khu vực admin hoặc theme không có 404.php).
+		if ( ! headers_sent() ) {
+			header( 'Content-Type: text/html; charset=utf-8' );
+		}
+		echo '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>404 Not Found</title>';
+		echo '<style>body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:#f6f7f7;color:#3c434a;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}.b{text-align:center}.c{font-size:64px;font-weight:700;margin:0;color:#1d2327}p{font-size:15px;color:#646970}</style>';
+		echo '</head><body><div class="b"><p class="c">404</p><p>' . esc_html__( 'Không tìm thấy trang bạn yêu cầu.', 'mt-security' ) . '</p></div></body></html>';
+		exit;
 	}
 
 	/**

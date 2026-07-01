@@ -59,6 +59,13 @@ final class MT_Security {
 			( new MT_Sec_Firewall( $this->settings ) )->run();
 		}
 
+		// Đổi đường dẫn đăng nhập PHẢI nạp sớm (trước khi 'plugins_loaded' kích hoạt)
+		// để hook can thiệp login chạy đúng, nếu không slug mới sẽ bị 404.
+		if ( $this->enabled( 'custom_login' ) ) {
+			require_once MT_SEC_DIR . 'includes/class-mt-login-url.php';
+			( new MT_Sec_Login_Url( $this->settings ) )->run();
+		}
+
 		// Phần còn lại nạp khi WP đã sẵn sàng.
 		add_action( 'plugins_loaded', array( $this, 'load_modules' ) );
 		add_action( 'init', array( $this, 'load_textdomain' ) );
@@ -86,11 +93,7 @@ final class MT_Security {
 			( new MT_Sec_Bruteforce( $this->settings ) )->run();
 		}
 
-		// Đổi đường dẫn đăng nhập.
-		if ( $this->enabled( 'custom_login' ) ) {
-			require_once MT_SEC_DIR . 'includes/class-mt-login-url.php';
-			( new MT_Sec_Login_Url( $this->settings ) )->run();
-		}
+		// Lưu ý: module "Đổi đường dẫn đăng nhập" đã được nạp sớm trong constructor.
 
 		// Đăng nhập 2 lớp (2FA).
 		if ( $this->enabled( 'two_factor' ) ) {

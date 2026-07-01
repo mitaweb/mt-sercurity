@@ -3,7 +3,7 @@
  * Plugin Name:       MT Security
  * Plugin URI:        https://example.com/mt-security
  * Description:        Bộ bảo mật toàn diện cho WordPress: chống spam bình luận, đăng nhập 2 lớp (2FA), tắt XML-RPC, ẩn phiên bản WP, đổi đường dẫn đăng nhập, khóa IP khi đăng nhập sai, và tường lửa (WAF). Tối ưu tốc độ, không làm chậm website.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 5.0
  * Requires PHP:      7.2
  * Author:            MT
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // ----- Hằng số -----
-define( 'MT_SEC_VERSION', '1.0.0' );
+define( 'MT_SEC_VERSION', '1.0.1' );
 define( 'MT_SEC_FILE', __FILE__ );
 define( 'MT_SEC_DIR', plugin_dir_path( __FILE__ ) );
 define( 'MT_SEC_URL', plugin_dir_url( __FILE__ ) );

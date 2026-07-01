@@ -41,5 +41,10 @@ Bộ bảo mật toàn diện, nhẹ và nhanh cho WordPress.
 
 == Changelog ==
 
+= 1.0.1 =
+* Sửa lỗi: khi bật "Đổi đường dẫn đăng nhập", đường dẫn mới báo 404. Nguyên nhân do hook can thiệp login đăng ký sai thời điểm (plugins_loaded đã chạy qua) và require wp-login.php trước khi pluggable.php nạp. Nay chuyển sang hook wp_loaded và nạp module sớm trong constructor.
+* Chặn khách vào /wp-admin trả về 404 (thay vì bị đá về trang đăng nhập), xử lý ở hook init.
+* Trang 404 fallback gọn gàng hơn.
+
 = 1.0.0 =
 * Phát hành lần đầu.
