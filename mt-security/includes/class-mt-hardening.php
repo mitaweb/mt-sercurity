@@ -87,7 +87,10 @@ class MT_Sec_Hardening {
 	 * @return string
 	 */
 	public function strip_core_version( $src ) {
-		if ( $src && false !== strpos( $src, 'ver=' ) ) {
+		// Chỉ xử lý asset của WP core (wp-includes / wp-admin) để KHÔNG phá
+		// cache-busting của theme/plugin. Version core mới là thứ cần ẩn nhất.
+		if ( $src && false !== strpos( $src, 'ver=' )
+			&& ( false !== strpos( $src, '/wp-includes/' ) || false !== strpos( $src, '/wp-admin/' ) ) ) {
 			$src = remove_query_arg( 'ver', $src );
 		}
 		return $src;

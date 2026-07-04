@@ -251,6 +251,11 @@ final class MT_Security {
 			add_option( MT_SEC_OPTION, self::default_settings() );
 		}
 
+		// Khởi tạo baseline admin 1 lần (coi các admin hiện tại là hợp lệ) ->
+		// tránh phải truy vấn kiểm tra ở mỗi request về sau.
+		require_once MT_SEC_DIR . 'includes/class-mt-user-guard.php';
+		MT_Sec_User_Guard::seed_baseline();
+
 		// Nạp module login url để đăng ký rewrite rồi flush.
 		$settings = get_option( MT_SEC_OPTION, self::default_settings() );
 		if ( ! empty( $settings['custom_login'] ) ) {

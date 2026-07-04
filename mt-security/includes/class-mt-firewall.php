@@ -241,9 +241,7 @@ class MT_Sec_Firewall {
 	 * @param string $reason Lý do (để log).
 	 */
 	private function block( $reason ) {
-		// Ghi log nhẹ (đếm số lần chặn) — không ghi file để khỏi chậm.
-		$count = (int) get_option( 'mt_sec_fw_blocked', 0 );
-		update_option( 'mt_sec_fw_blocked', $count + 1, false );
+		$this->bump_blocked();
 
 		if ( ! headers_sent() ) {
 			status_header( 403 );
@@ -253,5 +251,28 @@ class MT_Sec_Firewall {
 		// Phản hồi tối giản, không lộ thông tin.
 		echo '403 Forbidden';
 		exit;
+	}
+
+	/**
+	 * Tăng bộ đếm request đã chặn — có tiết chế ghi DB.
+	 *
+	 * Cộng dồn trong object cache; chỉ ghi xuống DB tối đa ~1 lần/60s để tránh
+	 * khuếch đại lượt GHI khi bị tấn công dồn dập (mỗi request xấu = 1 write).
+	 * Với site có object cache bền (Redis/Memcached) số đếm vẫn chính xác;
+	 * không có cache bền thì chấp nhận sai số nhỏ, đổi lấy việc không spam ghi DB.
+	 */
+	private function bump_blocked() {
+		$pending = (int) wp_cache_get( 'fw_pending', 'mt_sec' ) + 1;
+		wp_cache_set( 'fw_pending', $pending, 'mt_sec' );
+
+		// Khóa tiết chế: còn hiệu lực -> chưa ghi DB.
+		if ( get_transient( 'mt_sec_fw_wlock' ) ) {
+			return;
+		}
+		set_transient( 'mt_sec_fw_wlock', 1, MINUTE_IN_SECONDS );
+		wp_cache_set( 'fw_pending', 0, 'mt_sec' );
+
+		$count = (int) get_option( 'mt_sec_fw_blocked', 0 );
+		update_option( 'mt_sec_fw_blocked', $count + $pending, false );
 	}
 }

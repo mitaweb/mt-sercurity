@@ -42,18 +42,21 @@ class MT_Sec_Two_Factor {
 	 * Chạy module.
 	 */
 	public function run() {
-		// Luồng đăng nhập.
+		// Luồng đăng nhập (cần cả ở front-end/wp-login).
 		add_filter( 'authenticate', array( $this, 'verify_step' ), 5, 1 );
 		add_filter( 'authenticate', array( $this, 'request_step' ), 50, 1 );
 
-		// Thiết lập 2FA trong trang hồ sơ user.
-		add_action( 'show_user_profile', array( $this, 'profile_fields' ) );
-		add_action( 'edit_user_profile', array( $this, 'profile_fields' ) );
-		add_action( 'personal_options_update', array( $this, 'save_profile' ) );
-		add_action( 'edit_user_profile_update', array( $this, 'save_profile' ) );
+		// Các hook dưới đây chỉ dùng trong khu vực quản trị -> không đăng ký ở front-end.
+		if ( is_admin() ) {
+			// Thiết lập 2FA trong trang hồ sơ user.
+			add_action( 'show_user_profile', array( $this, 'profile_fields' ) );
+			add_action( 'edit_user_profile', array( $this, 'profile_fields' ) );
+			add_action( 'personal_options_update', array( $this, 'save_profile' ) );
+			add_action( 'edit_user_profile_update', array( $this, 'save_profile' ) );
 
-		// Nhắc user bắt buộc 2FA nhưng chưa thiết lập.
-		add_action( 'admin_notices', array( $this, 'enroll_notice' ) );
+			// Nhắc user bắt buộc 2FA nhưng chưa thiết lập.
+			add_action( 'admin_notices', array( $this, 'enroll_notice' ) );
+		}
 	}
 
 	/* ============================================================

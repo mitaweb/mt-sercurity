@@ -24,10 +24,20 @@ class MT_Sec_User_Guard {
 
 	/**
 	 * Tên option lưu danh sách admin đã được duyệt (baseline).
+	 */
+	const AUTHORIZED_OPTION = 'mt_sec_authorized_admins';
+
+	/**
+	 * Transient cache cờ cảnh báo (số admin lạ / bị ẩn).
+	 */
+	const ALERT_TRANSIENT = 'mt_sec_admin_alert';
+
+	/**
+	 * Tên option lưu danh sách admin đã được duyệt (baseline).
 	 *
 	 * @var string
 	 */
-	private $authorized_option = 'mt_sec_authorized_admins';
+	private $authorized_option = self::AUTHORIZED_OPTION;
 
 	/**
 	 * Constructor.
@@ -39,13 +49,22 @@ class MT_Sec_User_Guard {
 	}
 
 	/**
+	 * Khởi tạo baseline admin nếu chưa có (chạy lúc kích hoạt hoặc lazy khi cần).
+	 * Coi các admin hiện tại là hợp lệ. Không truy vấn nếu đã tồn tại.
+	 */
+	public static function seed_baseline() {
+		if ( false === get_option( self::AUTHORIZED_OPTION, false ) ) {
+			$guard = new self( array() );
+			update_option( self::AUTHORIZED_OPTION, $guard->real_admin_ids(), false );
+		}
+	}
+
+	/**
 	 * Chạy module.
 	 */
 	public function run() {
-		// Khởi tạo baseline admin nếu chưa có (lần đầu = coi các admin hiện tại là hợp lệ).
-		if ( false === get_option( $this->authorized_option, false ) ) {
-			update_option( $this->authorized_option, $this->real_admin_ids(), false );
-		}
+		// Baseline admin được khởi tạo 1 lần lúc kích hoạt (MT_Security::activate) và
+		// lazy-init trong guard_user() nếu thiếu -> KHÔNG truy vấn DB ở mỗi request.
 
 		// ----- Chặn tạo tài khoản mới (đăng ký công khai) -----
 		if ( ! empty( $this->s['block_registration'] ) ) {
@@ -142,12 +161,18 @@ class MT_Sec_User_Guard {
 			return;
 		}
 
-		$authorized = (array) get_option( $this->authorized_option, array() );
-		if ( in_array( (int) $user_id, array_map( 'intval', $authorized ), true ) ) {
+		$authorized = get_option( $this->authorized_option, false );
+		// Lazy-init baseline nếu thiếu (vd cập nhật ghi đè file mà không kích hoạt lại).
+		if ( false === $authorized ) {
+			self::seed_baseline();
+			return; // Lần đầu: coi toàn bộ admin hiện tại là hợp lệ.
+		}
+		if ( in_array( (int) $user_id, array_map( 'intval', (array) $authorized ), true ) ) {
 			return; // Admin đã được duyệt.
 		}
 
-		// Admin lạ -> gửi cảnh báo.
+		// Admin lạ -> xóa cache cảnh báo để tính lại, rồi gửi cảnh báo.
+		delete_transient( self::ALERT_TRANSIENT );
 		$this->alert_rogue_admin( $user, $context );
 
 		// Nếu bật chặn cứng -> hạ quyền ngay, chờ chủ site duyệt thủ công.
@@ -280,8 +305,38 @@ class MT_Sec_User_Guard {
 			}
 		}
 
+		// Trạng thái admin đã đổi -> xóa cache cảnh báo để tính lại.
+		delete_transient( self::ALERT_TRANSIENT );
+
 		wp_safe_redirect( admin_url( 'admin.php?page=mt-security&mt_sec_done=1#user-guard' ) );
 		exit;
+	}
+
+	/**
+	 * Cờ cảnh báo (số admin lạ / bị ẩn), cache trong transient để không quét DB
+	 * ở mỗi trang admin. Chỉ tính lại khi cache hết hạn hoặc bị xóa.
+	 *
+	 * @return array{rogue:int,hidden:int}
+	 */
+	private function get_alert_flags() {
+		$cached = get_transient( self::ALERT_TRANSIENT );
+		if ( is_array( $cached ) && isset( $cached['rogue'], $cached['hidden'] ) ) {
+			return $cached;
+		}
+
+		$rogue  = 0;
+		$hidden = 0;
+		foreach ( $this->get_admin_report() as $r ) {
+			if ( ! $r['authorized'] ) {
+				$rogue++;
+			}
+			if ( $r['hidden'] ) {
+				$hidden++;
+			}
+		}
+		$flags = array( 'rogue' => $rogue, 'hidden' => $hidden );
+		set_transient( self::ALERT_TRANSIENT, $flags, 12 * HOUR_IN_SECONDS );
+		return $flags;
 	}
 
 	/**
@@ -291,17 +346,9 @@ class MT_Sec_User_Guard {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		$report = $this->get_admin_report();
-		$rogue  = 0;
-		$hidden = 0;
-		foreach ( $report as $r ) {
-			if ( ! $r['authorized'] ) {
-				$rogue++;
-			}
-			if ( $r['hidden'] ) {
-				$hidden++;
-			}
-		}
+		$flags  = $this->get_alert_flags();
+		$rogue  = $flags['rogue'];
+		$hidden = $flags['hidden'];
 		if ( $rogue || $hidden ) {
 			echo '<div class="notice notice-error"><p>';
 			echo '<strong>MT Security:</strong> ';

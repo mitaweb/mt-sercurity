@@ -41,6 +41,13 @@ Bộ bảo mật toàn diện, nhẹ và nhanh cho WordPress.
 
 == Changelog ==
 
+= 1.0.2 =
+* Tối ưu hiệu năng: bỏ 1 truy vấn DB thừa trên MỖI request (baseline admin của User Guard nay khởi tạo lúc kích hoạt + lazy khi cần).
+* Tối ưu admin: cache cờ cảnh báo "admin ẩn/chưa duyệt" (transient 12h) thay vì quét usermeta trên mọi trang admin; tự làm mới khi có thay đổi.
+* Tường lửa: tiết chế ghi DB bộ đếm (cộng dồn object cache, ghi tối đa ~1 lần/60s) để tránh khuếch đại ghi khi bị tấn công dồn dập.
+* Ẩn version: chỉ gỡ ?ver của asset WP core, giữ cache-busting cho theme/plugin.
+* Vi chỉnh: chỉ đăng ký hook hồ sơ/thông báo của 2FA trong khu vực admin.
+
 = 1.0.1 =
 * Sửa lỗi: khi bật "Đổi đường dẫn đăng nhập", đường dẫn mới báo 404. Nguyên nhân do hook can thiệp login đăng ký sai thời điểm (plugins_loaded đã chạy qua) và require wp-login.php trước khi pluggable.php nạp. Nay chuyển sang hook wp_loaded và nạp module sớm trong constructor.
 * Chặn khách vào /wp-admin trả về 404 (thay vì bị đá về trang đăng nhập), xử lý ở hook init.
