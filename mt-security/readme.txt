@@ -41,6 +41,11 @@ Bộ bảo mật toàn diện, nhẹ và nhanh cho WordPress.
 
 == Changelog ==
 
+= 1.0.3 =
+* Sửa quan trọng: khi đang bị khóa IP, nếu nhập ĐÚNG mật khẩu thì vẫn cho đăng nhập (khóa chỉ chặn dò mật khẩu sai). Khắc phục tình huống bị khóa oan khi đứng sau Cloudflare/proxy (nhiều người dùng chung 1 IP).
+* Chống brute-force nay bỏ qua hoàn toàn IP trong danh sách tin cậy (whitelist), dùng chung với tường lửa.
+* Đăng nhập thành công xóa luôn bộ đếm "strike" (tránh cộng dồn gây khóa dài oan).
+
 = 1.0.2 =
 * Tối ưu hiệu năng: bỏ 1 truy vấn DB thừa trên MỖI request (baseline admin của User Guard nay khởi tạo lúc kích hoạt + lazy khi cần).
 * Tối ưu admin: cache cờ cảnh báo "admin ẩn/chưa duyệt" (transient 12h) thay vì quét usermeta trên mọi trang admin; tự làm mới khi có thay đổi.

@@ -82,8 +82,21 @@ class MT_Sec_Bruteforce {
 			return $user;
 		}
 
-		$ip       = MT_Security::get_ip( ! empty( $this->s['fw_trust_proxy'] ) );
-		$until    = get_transient( $this->lock_key( $ip ) );
+		// Mật khẩu ĐÚNG (đã được xác thực ở priority trước) -> cho chính chủ đăng
+		// nhập kể cả khi IP đang bị khóa. Cơ chế khóa chỉ nhằm chặn việc DÒ mật
+		// khẩu SAI, không nên chặn người đã nhập đúng (2FA vẫn áp dụng nếu bật).
+		if ( $user instanceof WP_User ) {
+			return $user;
+		}
+
+		$ip = MT_Security::get_ip( ! empty( $this->s['fw_trust_proxy'] ) );
+
+		// IP tin cậy (whitelist) -> không bao giờ bị khóa.
+		if ( $this->is_whitelisted( $ip ) ) {
+			return $user;
+		}
+
+		$until = get_transient( $this->lock_key( $ip ) );
 
 		if ( $until && $until > time() ) {
 			$minutes = ceil( ( $until - time() ) / 60 );
@@ -106,7 +119,13 @@ class MT_Sec_Bruteforce {
 	 * @param string $username Tên đăng nhập đã thử.
 	 */
 	public function on_failed( $username ) {
-		$ip          = MT_Security::get_ip( ! empty( $this->s['fw_trust_proxy'] ) );
+		$ip = MT_Security::get_ip( ! empty( $this->s['fw_trust_proxy'] ) );
+
+		// IP tin cậy -> không đếm, không khóa.
+		if ( $this->is_whitelisted( $ip ) ) {
+			return;
+		}
+
 		$max         = max( 1, (int) $this->s['bf_max_attempts'] );
 		$lock_min    = max( 1, (int) $this->s['bf_lockout_minutes'] );
 		$window      = $lock_min * 60; // Cửa sổ đếm = thời gian khóa.
@@ -147,5 +166,25 @@ class MT_Sec_Bruteforce {
 		$ip = MT_Security::get_ip( ! empty( $this->s['fw_trust_proxy'] ) );
 		delete_transient( $this->attempts_key( $ip ) );
 		delete_transient( $this->lock_key( $ip ) );
+		delete_transient( $this->strikes_key( $ip ) );
+	}
+
+	/**
+	 * IP có trong danh sách tin cậy không (dùng chung với tường lửa).
+	 *
+	 * @param string $ip IP.
+	 * @return bool
+	 */
+	private function is_whitelisted( $ip ) {
+		if ( empty( $this->s['fw_whitelist_ips'] ) ) {
+			return false;
+		}
+		foreach ( preg_split( '/[\r\n,]+/', $this->s['fw_whitelist_ips'] ) as $entry ) {
+			$entry = trim( $entry );
+			if ( '' !== $entry && $entry === $ip ) {
+				return true;
+			}
+		}
+		return false;
 	}
 }
