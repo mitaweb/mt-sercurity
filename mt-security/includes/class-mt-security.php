@@ -49,6 +49,8 @@ final class MT_Security {
 			add_action( 'init', array( $this, 'load_textdomain' ) );
 			if ( is_admin() ) {
 				add_action( 'plugins_loaded', array( $this, 'load_admin_only' ) );
+				// Cảnh báo to rõ: mọi tính năng bảo mật đang TẮT, kẻo tưởng plugin vẫn chạy.
+				add_action( 'admin_notices', array( $this, 'emergency_notice' ) );
 			}
 			return;
 		}
@@ -120,6 +122,18 @@ final class MT_Security {
 	public function load_admin_only() {
 		require_once MT_SEC_DIR . 'includes/class-mt-admin.php';
 		( new MT_Sec_Admin( $this->settings ) )->run();
+	}
+
+	/**
+	 * Cảnh báo khi chế độ khẩn cấp đang bật (MT_SEC_DISABLE trong wp-config.php).
+	 */
+	public function emergency_notice() {
+		echo '<div class="notice notice-error"><p>';
+		echo '<strong>⚠ MT Security ĐANG TẮT!</strong> ';
+		echo esc_html__( 'Hằng số MT_SEC_DISABLE đang bật trong wp-config.php nên TOÀN BỘ tính năng bảo mật (tường lửa, khóa IP, đổi link đăng nhập, 2FA...) không hoạt động. Hãy xóa dòng', 'mt-security' );
+		echo ' <code>define(\'MT_SEC_DISABLE\', true);</code> ';
+		echo esc_html__( 'khỏi wp-config.php để bật lại bảo vệ.', 'mt-security' );
+		echo '</p></div>';
 	}
 
 	/**
