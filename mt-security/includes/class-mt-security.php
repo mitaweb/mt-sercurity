@@ -77,6 +77,13 @@ final class MT_Security {
 	 * Nạp các module theo cấu hình.
 	 */
 	public function load_modules() {
+		// Tự phục hồi quyền quản trị tài khoản cho Administrator (chạy bất kể module
+		// Bảo vệ tài khoản bật hay tắt) — sửa hậu quả bản cũ từng gỡ quyền khỏi DB.
+		if ( is_admin() ) {
+			require_once MT_SEC_DIR . 'includes/class-mt-user-guard.php';
+			add_action( 'admin_init', array( 'MT_Sec_User_Guard', 'restore_admin_user_caps' ) );
+		}
+
 		// Gia cố hệ thống: ẩn version, tắt xmlrpc, chặn dò user...
 		if ( $this->enabled( 'hardening' ) ) {
 			require_once MT_SEC_DIR . 'includes/class-mt-hardening.php';
@@ -269,6 +276,9 @@ final class MT_Security {
 		// tránh phải truy vấn kiểm tra ở mỗi request về sau.
 		require_once MT_SEC_DIR . 'includes/class-mt-user-guard.php';
 		MT_Sec_User_Guard::seed_baseline();
+
+		// Phục hồi ngay quyền quản trị tài khoản (nếu bản cũ từng gỡ khỏi role).
+		MT_Sec_User_Guard::restore_admin_user_caps();
 
 		// Nạp module login url để đăng ký rewrite rồi flush.
 		$settings = get_option( MT_SEC_OPTION, self::default_settings() );

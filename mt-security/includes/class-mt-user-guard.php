@@ -60,6 +60,25 @@ class MT_Sec_User_Guard {
 	}
 
 	/**
+	 * Tự phục hồi quyền quản trị TÀI KHOẢN cho vai trò Administrator.
+	 * Bản plugin cũ / plugin bảo mật khác có thể đã gỡ hẳn các quyền này khỏi role
+	 * trong DB (admin mất nút "Thêm mới" ở menu Tài khoản) — tắt plugin cũng không
+	 * tự trả lại. Kiểm tra mỗi lần vào wp-admin, thiếu quyền nào thì thêm lại
+	 * (chỉ ghi DB khi thật sự thiếu).
+	 */
+	public static function restore_admin_user_caps() {
+		$role = get_role( 'administrator' );
+		if ( ! $role ) {
+			return;
+		}
+		foreach ( array( 'create_users', 'edit_users', 'delete_users', 'promote_users', 'list_users', 'remove_users' ) as $cap ) {
+			if ( ! $role->has_cap( $cap ) ) {
+				$role->add_cap( $cap );
+			}
+		}
+	}
+
+	/**
 	 * Chạy module.
 	 */
 	public function run() {
